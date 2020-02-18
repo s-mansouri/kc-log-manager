@@ -1,0 +1,74 @@
+version: '3.7'
+
+services:
+  zookeeper:
+    image: zookeeper:3.4.9
+    container_name: zookeeper
+    restart: unless-stopped
+    hostname: zookeeper
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    volumes:
+      - /srv/kafka/zookeeper/data:/data
+      - /srv/kafka/zookeeper/datalog:/datalog
+    ports:
+      - 2181:2181
+    networks:
+      - kafka-net
+
+  kafka:
+    image: confluentinc/cp-kafka:5.2.2
+    container_name: kafka
+    restart: unless-stopped
+    hostname: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - /srv/kafka/kafka/data:/var/lib/kafka/data
+    networks:
+      - kafka-net
+    ports:
+      - 9092:9092
+
+  kafka-ui:
+    image: sourcelaborg/kafka-webview:latest
+    container_name: kafka_ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    networks:
+      - kafka-net
+    ports:
+      - 8080:8080
+
+  zookeeper-ui:
+    image: tobilg/zookeeper-webui:latest
+    container_name: zookeeper_ui
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      HTTP_PORT: 8080
+      USER: admin
+      PASSWORD: admin
+      ZK_DEFAULT_NODE: zookeeper:2181/
+    volumes:
+      - /srv/kafka/kafkawebview:/app/data
+    networks:
+      - kafka-net
+    ports:
+      - 8081:8080
+
+networks:
+  kafka-net:
+    driver: bridge

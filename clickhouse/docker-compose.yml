@@ -1,0 +1,57 @@
+version: '3.7'
+
+services:
+  zookeeper:
+    image: zookeeper:3.4.9
+    container_name: clickhouse-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    volumes:
+      - /srv/clickhouse/zookeeper/data:/data
+      - /srv/clickhouse/zookeeper/datalog:/datalog
+    ports:
+      - 2181:2181
+      - 2182:2182
+    networks:
+      - clickhouse-net
+
+  clickhouse-1:
+    image: yandex/clickhouse-server:19.17.9.6
+    container_name: clickhouse-1
+    restart: unless-stopped
+    ports:
+      - 9000:9000
+      - 8123:8123
+      - 9009:9009
+    volumes:
+      # - ./etc/clickhouse_config.xml:/etc/clickhouse-server/config.xml
+      # - ./etc/clickhouse_metrika.xml:/etc/clickhouse-server/metrika.xml
+      # - ./etc/macros/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml
+      # - ./etc/users.xml:/etc/clickhouse-server/users.xml
+      - /srv/clickhouse/clickhouse-1/data:/var/lib/clickhouse
+      - /srv/clickhouse/clickhouse-1/log:/var/log/clickhouse-server
+    networks:
+      - clickhouse-net
+    depends_on:
+      - clickhouse-zookeeper
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  clickhouse-client:
+    image: yandex/clickhouse-client:19.17.9.6
+    command:
+      - '--host clickhouse-1'
+    networks:
+      - clickhouse-net
+    depends_on:
+      - clickhouse-1
+
+networks:
+  clickhouse-net:
+    driver: bridge
