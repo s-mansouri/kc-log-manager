@@ -34,7 +34,8 @@ services:
       KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
-      - /srv/kafka/kafka/data:/var/lib/kafka/data
+#      - /srv/kafka/config/server.properties:/etc/kafka/server.properties
+      - /srv/kafka/data:/var/lib/kafka/data
     networks:
       - kafka-net
     ports:
