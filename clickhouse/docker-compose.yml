@@ -1,7 +1,7 @@
 version: '3.7'
 
 services:
-  zookeeper:
+  clickhouse-zookeeper:
     image: zookeeper:3.4.9
     container_name: clickhouse-zookeeper
     restart: unless-stopped
