@@ -1,0 +1,110 @@
+version: '3.7'
+
+services:
+  clickhouse-1:
+    image: yandex/clickhouse-server:19.17.9.6
+    container_name: clickhouse-1
+    restart: unless-stopped
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - /srv/clickhouse/clickhouse-1/data:/var/lib/clickhouse
+      - /srv/clickhouse/clickhouse-1/log:/var/log/clickhouse-server
+    ports:
+      - 9000:9000
+      - 8123:8123
+      - 9009:9009
+    networks:
+      - kcl-net
+
+  zookeeper:
+    image: zookeeper:3.4.9
+    container_name: zookeeper
+    restart: unless-stopped
+    hostname: zookeeper
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    volumes:
+      - /srv/kafka/zookeeper/data:/data
+      - /srv/kafka/zookeeper/datalog:/datalog
+    ports:
+      - 2181:2181
+    networks:
+      - kcl-net
+
+  kafka:
+    image: confluentinc/cp-kafka:5.2.2
+    container_name: kafka
+    restart: unless-stopped
+    hostname: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - /srv/kafka/data:/var/lib/kafka/data
+    ports:
+      - 9092:9092
+    networks:
+      - kcl-net
+
+  nginx:
+    image: mirror.imbco.ir:4000/library/nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    environment:
+      TEST: 1
+    volumes:
+      - /srv/nginx/nginx/log:/var/log/nginx
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8082:80
+    networks:
+      - kcl-net
+
+  # runs a defined simulation to create live logs on the nginx server
+  gatling:
+    image: mirror.imbco.ir:4000/denvazh/gatling:2.1.7
+    container_name: gatling
+    volumes:
+      - ./gatling/simulations:/opt/gatling/user-files/simulations:ro
+      - /srv/nginx/gatling/results:/opt/gatling/results
+    depends_on:
+      - nginx
+    # keep container running for manual tests it also avoids issue where containers close if run in foreground
+    # sleep upfront to give a chance for the rest of the services to initialize
+    command: "sh -c sleep 5s && gatling.sh -sf /opt/gatling/user-files/simulations/ -m && sleep infinity"
+    networks:
+      - kcl-net
+
+  kafkacat:
+    image: mirror.imbco.ir:4000/confluentinc/cp-kafkacat:5.4.0
+    container_name: kafkacat
+    command:
+      - bash
+      - -c
+      - tail -f /var/log/nginx/access.log | kafkacat -b kafka:19092 -t accesslog2
+    depends_on:
+      - nginx
+    volumes:
+      - /srv/nginx/nginx/log:/var/log/nginx
+    networks:
+      - kcl-net
+
+volumes:
+  log:
+
+networks:
+  kcl-net:
+    driver: bridge
