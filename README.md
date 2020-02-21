@@ -1,7 +1,7 @@
-#KCL
+# KCL
 
 Store Nginx log to Clickhouse, through Kafka
-##Clickhouse:
+## Clickhouse:
 connect to Clickhouse from a native client
 
 ```bash
@@ -57,7 +57,7 @@ sample data
 "http_user_agent": "curl/7.52.1"
 }
 ```
-##Kafka
+## Kafka
 
 - create topic:
 ```bash
@@ -92,7 +92,7 @@ kafka-console-producer --broker-list 127.0.0.1:9092 --topic myfirst
 kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic myfirst -from-beginning
 ```
 
-#kafkacat
+## kafkacat
 - read log from file
 ```bash
 docker run --rm -i --volume /srv/nginx/nginx/log:/var/log/nginx --network kcl_kcl-net mirror.imbco.ir:4000/confluentinc/cp-kafkacat:5.4.0 kafkacat -b kafka:19092 -t accesslog2 -P -l /var/log/nginx/access.log
