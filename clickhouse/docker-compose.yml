@@ -45,4 +45,5 @@ services:
 
 networks:
   clickhouse-net:
-    driver: bridge
+    external: true
+    name: kafka_kafka-net

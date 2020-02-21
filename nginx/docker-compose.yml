@@ -1,0 +1,53 @@
+version: '3.7'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    hostname: nginx
+    command: sh -c "unlink /var/log/nginx/access.log && nginx -g \"daemon off;\" -c /etc/nginx/nginx.conf"
+    environment:
+      TEST: 1
+    volumes:
+      - /srv/nginx/nginx/log:/var/log/nginx:z
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - nginx-net
+
+  # runs a defined simulation to create live logs on the nginx server
+  gatling:
+    image: denvazh/gatling:2.1.7
+    volumes:
+      - ./gatling/simulations:/opt/gatling/user-files/simulations:ro
+      - /srv/nginx/gatling/results:/opt/gatling/results
+    links:
+      - nginx:nginx
+    # keep container running for manual tests it also avoids issue where containers close if run in foreground
+    # sleep upfront to give a chance for the rest of the services to initialize
+    command: sh -c "sleep 5s && gatling.sh -sf /opt/gatling/user-files/simulations/ -m && sleep infinity"
+  networks:
+    - nginx-net
+
+  kafkacat:
+    image: confluentinc/cp-kafkacat:5.4.0
+    container_name: kafkacat
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    volumes:
+      - /srv/nginx/nginx/log:log:/var/log/nginx:z
+    command:
+      - "kafkacat -b kafka:9092 -t accesslog -P -l /var/log/nginx/access.log"
+    networks:
+      - nginx-net
+
+volumes:
+  log:
+
+networks:
+  nginx-net:
+    external: true
+    name: kafka_kafka-net

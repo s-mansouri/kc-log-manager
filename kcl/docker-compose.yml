@@ -84,7 +84,7 @@ services:
       - nginx
     # keep container running for manual tests it also avoids issue where containers close if run in foreground
     # sleep upfront to give a chance for the rest of the services to initialize
-    command: "sh -c sleep 5s && gatling.sh -sf /opt/gatling/user-files/simulations/ -m && sleep infinity"
+    command: "-sf /opt/gatling/user-files/simulations/ -m"
     networks:
       - kcl-net
 
@@ -102,8 +102,24 @@ services:
     networks:
       - kcl-net
 
+  grafana:
+    image: mirror.imbco.ir:4000/grafana/grafana:6.5.2
+    container_name: grafana
+    restart: unless-stopped
+    env_file:
+      - grafana/provisioning/config.monitoring
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/plugin/Vertamedia-clickhouse-grafana-50d46ef:/var/lib/grafana/plugins
+      - ./grafana/provisioning/:/etc/grafana/provisioning
+    networks:
+      - kcl-net
+
 volumes:
   log:
+  grafana-data:
 
 networks:
   kcl-net:
